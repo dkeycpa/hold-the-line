@@ -1,0 +1,209 @@
+<section id="htl-grunt">
+  <h2>Grunt</h2>
+  <canvas role="img" aria-label="Side view of a helmeted infantry unit with a mint shoulder stripe and a compact rifle"></canvas>
+  <div class="viz-controls">
+    <button class="btn btn-primary" type="button" data-cue="advance">Advance &amp; fire</button>
+    <button class="btn" type="button" data-cue="ready">“Ready”</button>
+    <button class="btn" type="button" data-cue="hit">Take hit</button>
+  </div>
+  <p class="text-small tabular-nums" aria-live="polite">Idle · 100 HP</p>
+  <p class="text-small text-muted">40 resources · 80 units/s · 180 range · 12 damage every 0.8 s</p>
+</section>
+<style>
+  #htl-grunt { display: grid; gap: calc(var(--font-size-base, 14px) * .6); }
+  #htl-grunt canvas { display: block; width: 100%; height: clamp(165px, 40vw, 260px); }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('htl-grunt');
+  const canvas = root.querySelector('canvas');
+  const status = root.querySelector('[aria-live]');
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let audio, noise, frame, hp = 100;
+  let position = 0, pose = 'idle', elapsed = 0, flash = false;
+  const palette = {
+    sky: '#273b38', ridge: '#344b42', bushes: '#53674d', ground: '#aa9067',
+    dust: '#c8ad7e', shadow: '#665948', outline: '#212c28', uniform: '#69794f',
+    light: '#899565', gear: '#424e39', skin: '#be9b77', team: '#94e5cc',
+    metal: '#414e4d', glint: '#82908a', flash: '#ffe29e'
+  };
+  function shape(color, points, edge = false) {
+    ctx.beginPath();
+    points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    ctx.closePath();
+    ctx.fillStyle = palette[color];
+    ctx.fill();
+    if (edge) {
+      ctx.strokeStyle = palette.outline;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+  }
+  function oval(color, x, y, rx, ry) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = palette[color];
+    ctx.fill();
+  }
+  function box(color, x, y, width, height) {
+    ctx.fillStyle = palette[color];
+    ctx.fillRect(x, y, width, height);
+  }
+  function leg(x, stride, up, color) {
+    shape(color, [[x, -40], [x + 12, -39], [x + stride * .55 + 9, -22],
+      [x + stride + 6, -7 - up], [x + stride - 3, -7 - up],
+      [x + stride * .55, -20]], true);
+    shape('outline', [[x + stride - 4, -9 - up], [x + stride + 6, -9 - up],
+      [x + stride + 11, -5 - up], [x + stride + 11, -1 - up], [x + stride - 5, -1 - up]]);
+  }
+  function draw() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const density = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * density);
+    canvas.height = Math.round(height * density);
+    ctx.setTransform(density, 0, 0, density, 0, 0);
+    box('sky', 0, 0, width, height);
+    shape('ridge', [[0, height * .62], [width * .19, height * .36], [width * .33, height * .5],
+      [width * .55, height * .26], [width * .69, height * .52], [width, height * .36],
+      [width, height], [0, height]]);
+    shape('bushes', [[0, height * .67], [width * .24, height * .61], [width * .5, height * .66],
+      [width * .74, height * .58], [width, height * .62], [width, height], [0, height]]);
+    box('ground', 0, height * .73, width, height);
+    box('dust', 0, height * .73, width, 2);
+    for (let i = 0; i < 25; i++) {
+      oval('dust', (i * 73) % width, height * .77 + (i * 19) % (height * .21), 3 + i % 7, 1);
+    }
+    const size = Math.min(height / 112, width / 178);
+    const moving = pose === 'walk' && !reduceMotion.matches;
+    const phase = elapsed * Math.PI * 6;
+    const stride = moving ? Math.sin(phase) * 12 : 3;
+    const bob = moving ? Math.abs(Math.cos(phase)) * 3 : 0;
+    const raised = pose === 'aim';
+    ctx.save();
+    ctx.translate(width * (.24 + .28 * position), height * .83);
+    ctx.scale(size, size);
+    oval('shadow', 5, 1, 26, 4);
+    leg(-8, -stride, moving ? Math.max(0, -Math.cos(phase)) * 6 : 0, 'gear');
+    leg(1, stride, moving ? Math.max(0, Math.cos(phase)) * 6 : 0, 'uniform');
+    ctx.translate(pose === 'hit' ? -4 : 0, -bob);
+    shape('gear', [[-12,-66],[-20,-62],[-22,-46],[-11,-43],[-8,-59]], true);
+    shape('uniform', [[-9,-67],[8,-66],[15,-56],[11,-38],[-10,-39],[-14,-54]], true);
+    box('outline', -10, -44, 22, 4);
+    box('gear', 2, -47, 9, 9);
+    oval('skin', 4, -72, 10, 11);
+    box('outline', 9, -76, 4, 2);
+    oval('outline', 0, -81, 15, 12);
+    oval('light', 0, -82, 13, 10);
+    oval('uniform', 4, -81, 10, 9);
+    box('gear', -14, -78, 30, 4);
+    box('outline', -5, -75, 2, 10);
+    ctx.save();
+    ctx.translate(flash ? -2 : 0, raised ? -61 : -50);
+    ctx.rotate(raised ? 0 : .28);
+    shape('metal', [[4,-2],[30,-2],[30,3],[23,3],[21,8],[16,8],[15,3],[4,5]], true);
+    box('outline', 28, -1, 13, 2);
+    box('glint', 13, -1, 14, 1);
+    if (flash) shape('flash', [[41,0],[46,-5],[46,-2],[54,0],[46,2],[46,5]]);
+    ctx.restore();
+    shape('light', [[-7,-64],[0,-63],[5,-55],[raised ? 18 : 15,raised ? -61 : -46],
+      [raised ? 20 : 17,raised ? -56 : -42],[4,-48],[-6,-50]], true);
+    box('team', -7, -61, 8, 3);
+    if (pose === 'hit') {
+      box('flash', -18, -59, 4, 2);
+      box('flash', -23, -63, 3, 2);
+    }
+    ctx.restore();
+  }
+  function sound(cue) {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return;
+    audio ??= new Audio();
+    audio.resume().catch(() => {});
+    if (!noise) {
+      noise = audio.createBuffer(1, Math.floor(audio.sampleRate * .18), audio.sampleRate);
+      const samples = noise.getChannelData(0);
+      for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+    }
+    const source = audio.createBufferSource();
+    const filter = audio.createBiquadFilter();
+    const gain = audio.createGain();
+    const now = audio.currentTime;
+    source.buffer = noise;
+    filter.type = 'bandpass';
+    filter.frequency.value = { fire: 1700, hit: 420, step: 240, ready: 2200 }[cue];
+    gain.gain.setValueAtTime({ fire: .42, hit: .32, step: .12, ready: .17 }[cue], now);
+    gain.gain.exponentialRampToValueAtTime(.001, now + (cue === 'hit' ? .16 : .085));
+    source.connect(filter).connect(gain).connect(audio.destination);
+    source.start(now);
+  }
+  function announce(label) {
+    status.textContent = label + ' · ' + hp + ' HP';
+  }
+  function play(cue) {
+    cancelAnimationFrame(frame);
+    flash = false;
+    if (cue === 'ready') {
+      pose = 'idle';
+      sound('ready');
+      if ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
+        speechSynthesis.cancel();
+        const voice = new SpeechSynthesisUtterance('Ready.');
+        voice.rate = 1.12;
+        voice.volume = .65;
+        speechSynthesis.speak(voice);
+      }
+      announce('Ready');
+      draw();
+      return;
+    }
+    if (cue === 'advance') {
+      position = 0;
+      hp = 100;
+      sound('step');
+      announce('Advancing');
+    } else {
+      hp = Math.max(0, hp - 12);
+      sound('hit');
+      announce('Hit');
+    }
+    const start = performance.now();
+    let lastBeat = -1;
+    function tick(now) {
+      elapsed = (now - start) / 1000;
+      if (cue === 'hit') {
+        pose = elapsed < .25 ? 'hit' : 'idle';
+      } else if (elapsed < 1.25) {
+        pose = 'walk';
+        position = Math.min(1, elapsed / 1.25);
+        const beat = Math.floor(elapsed * 6);
+        if (beat !== lastBeat && beat > 0) sound('step');
+        lastBeat = beat;
+      } else if (elapsed < 3.7) {
+        position = 1;
+        pose = 'aim';
+        const beat = Math.floor((elapsed - 1.5) / .8);
+        if (beat >= 0 && beat < 3 && beat !== lastBeat) {
+          sound('fire');
+          announce('Firing');
+        }
+        lastBeat = beat;
+        flash = !reduceMotion.matches && beat >= 0 && beat < 3 && (elapsed - 1.5) % .8 < .085;
+      } else {
+        pose = 'idle';
+        flash = false;
+        announce('Idle');
+      }
+      draw();
+      if (pose !== 'idle') frame = requestAnimationFrame(tick);
+    }
+    frame = requestAnimationFrame(tick);
+  }
+  root.querySelectorAll('[data-cue]').forEach(button => {
+    button.addEventListener('click', () => play(button.dataset.cue));
+  });
+  new ResizeObserver(draw).observe(canvas);
+  draw();
+})();
+</script>

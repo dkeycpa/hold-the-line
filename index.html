@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold the Line</title>
+<link rel="stylesheet" href="style.css">
+<script defer src="units.js"></script>
+<script defer src="grunt.js"></script>
+<script defer src="game.js"></script>
+<script defer src="briefing.js"></script>
+</head>
+<body>
+<main>
+  <header>
+    <div class="heading"><h1>Hold the Line</h1><span>Battlefield prototype</span></div>
+    <div class="radar-heading"><label for="radar">Battlefield radar</label><output id="range"></output></div>
+    <div class="radar">
+      <canvas id="overview" aria-hidden="true"></canvas>
+      <div id="window" aria-hidden="true"></div>
+      <input id="radar" type="range" min="0" step="any" value="0" aria-label="Battlefield radar">
+    </div>
+    <div class="sides"><span>Player base</span><span>Enemy base</span></div>
+  </header>
+  <section id="field" tabindex="0" aria-label="Battlefield. Use the left and right arrow keys to pan.">
+    <canvas id="landscape" aria-hidden="true"></canvas>
+    <button id="base-briefing" type="button" aria-haspopup="dialog"><span>Briefing Room</span></button>
+  </section>
+  <footer>
+    <span id="controls">Drag the field or radar · Use <kbd>←</kbd> <kbd>→</kbd> to pan</span>
+    <div class="field-controls">
+      <div class="grunt-controls" aria-label="Unit test controls">
+        <label for="spawn-type">Test unit</label>
+        <select id="spawn-type"></select>
+        <button id="spawn-grunt" type="button">Spawn Grunt</button>
+        <select id="active-unit" aria-label="Control a spawned unit" hidden></select>
+        <button id="grunt-fire" type="button" hidden>Test fire</button>
+        <button id="clear-units" type="button" hidden>Clear units</button>
+        <span id="grunt-status" role="status" class="visually-hidden"></span>
+      </div>
+      <nav aria-label="Jump to a base"><button id="player">Player base</button><button id="enemy">Enemy base</button></nav>
+    </div>
+  </footer>
+</main>
+<dialog id="briefing" aria-labelledby="briefing-title">
+  <form id="briefing-form">
+    <div class="briefing-header">
+      <div>
+        <p class="briefing-location">Player base · Before battle</p>
+        <h2 id="briefing-title">Briefing Room</h2>
+      </div>
+      <output id="remaining" aria-live="polite"></output>
+    </div>
+    <div class="briefing-body">
+      <fieldset>
+        <legend>Choose your Captain</legend>
+        <p>You'll directly control this soldier in battle. The Captain is included in your starting roster.</p>
+        <div class="captains">
+          <label><input type="radio" name="captain" value="Navy SEAL" required> <span><strong>Navy SEAL</strong><small>All-around soldier</small></span></label>
+          <label><input type="radio" name="captain" value="Sniper" required> <span><strong>Sniper</strong><small>Long-range specialist</small></span></label>
+        </div>
+      </fieldset>
+      <div id="catalog" aria-label="Roster purchases"></div>
+    </div>
+    <div class="briefing-actions">
+      <span id="roster-summary"></span>
+      <div>
+        <button id="cancel-briefing" type="button">Cancel</button>
+        <button class="primary" type="submit">Save roster</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+</body>
+</html>

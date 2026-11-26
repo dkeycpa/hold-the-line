@@ -1,0 +1,21 @@
+<style>
+  #roster { display:grid; gap:12px; }
+  #roster select { font:inherit; min-height:44px; max-width:100%; }
+  #roster canvas { width:100%; height:clamp(170px, 40vw, 280px); display:block; }
+  #roster dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:12px; margin:0; }
+  #roster dt { font-size:.875rem; }
+  #roster dd { margin:2px 0 0; font-variant-numeric:tabular-nums; }
+</style>
+<main id="roster">
+  <h2>Briefing Room roster</h2>
+  <div><label for="unit">Unit</label> <select id="unit"></select> <a href="/grunt">Grunt preview</a></div>
+  <canvas role="img"></canvas>
+  <div class="viz-controls">
+    <button class="btn btn-primary" type="button" id="demo">Play action</button>
+    <button class="btn" type="button" id="impact">Take hit</button>
+  </div>
+  <p id="unit-role"></p>
+  <p id="unit-status" aria-live="polite"></p>
+  <dl aria-label="Playtest attributes"></dl>
+</main>
+<script src="/roster.js"></script>
