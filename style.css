@@ -108,18 +108,14 @@ small { display: block; color: #bacac5; font-size: .8rem; }
 .primary:hover { background: #b5f1e0; }
 @media (max-width: 550px) { #catalog { grid-template-columns: 1fr; } }
 
-.field-controls, .grunt-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-#spawn-grunt { color: #94e5cc; border-color: #69897c; }
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+footer, .battle-controls, #placement-controls, #reinforcement-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
-
-.grunt-controls select {
+[hidden] { display: none !important; }
+.battle-controls select {
   max-width: 100%;
   padding: 6px 8px;
   font: inherit;
@@ -127,4 +123,6 @@ small { display: block; color: #bacac5; font-size: .8rem; }
   background: #243839;
   border: 1px solid #56726b;
 }
-.grunt-controls select:focus-visible { outline: 2px solid #ffe5a3; }
+.battle-controls select:focus-visible { outline: 2px solid #ffe5a3; }
+.battle-controls button:disabled { opacity: .45; cursor: default; }
+#controls { flex-basis: 100%; }

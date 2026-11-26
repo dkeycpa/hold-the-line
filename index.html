@@ -9,35 +9,39 @@
 <script defer src="grunt.js"></script>
 <script defer src="game.js"></script>
 <script defer src="briefing.js"></script>
+<script defer src="battle.js"></script>
 </head>
 <body>
 <main>
   <header>
-    <div class="heading"><h1>Hold the Line</h1><span>Battlefield prototype</span></div>
+    <div class="heading"><h1>Hold the Line</h1><span id="battle-status" role="status">Choose a captain and roster to prepare for battle.</span></div>
     <div class="radar-heading"><label for="radar">Battlefield radar</label><output id="range"></output></div>
     <div class="radar">
       <canvas id="overview" aria-hidden="true"></canvas>
       <div id="window" aria-hidden="true"></div>
       <input id="radar" type="range" min="0" step="any" value="0" aria-label="Battlefield radar">
     </div>
-    <div class="sides"><span>Player base</span><span>Enemy base</span></div>
+    <div class="sides"><span id="player-health">Player base</span><span id="enemy-health">Enemy base</span></div>
   </header>
   <section id="field" tabindex="0" aria-label="Battlefield. Use the left and right arrow keys to pan.">
     <canvas id="landscape" aria-hidden="true"></canvas>
     <button id="base-briefing" type="button" aria-haspopup="dialog"><span>Briefing Room</span></button>
   </section>
   <footer>
-    <span id="controls">Drag the field or radar · Use <kbd>←</kbd> <kbd>→</kbd> to pan</span>
-    <div class="field-controls">
-      <div class="grunt-controls" aria-label="Unit test controls">
-        <label for="spawn-type">Test unit</label>
-        <select id="spawn-type"></select>
-        <button id="spawn-grunt" type="button">Spawn Grunt</button>
-        <select id="active-unit" aria-label="Control a spawned unit" hidden></select>
-        <button id="grunt-fire" type="button" hidden>Test fire</button>
-        <button id="clear-units" type="button" hidden>Clear units</button>
-        <span id="grunt-status" role="status" class="visually-hidden"></span>
+    <div class="battle-controls">
+      <output id="battle-resources" aria-label="Resources"></output>
+      <button id="open-briefing" type="button">Briefing Room</button>
+      <div id="placement-controls" hidden>
+        <select id="defense-type" aria-label="Defense to place"></select>
+        <button id="undo-defense" type="button" disabled>Undo placement</button>
       </div>
+      <button id="start-battle" class="primary" type="button" disabled>Start Battle</button>
+      <div id="reinforcement-controls" hidden>
+        <select id="reinforcement-type" aria-label="Reinforcement to recruit"></select>
+        <button id="recruit-unit" type="button">Recruit</button>
+      </div>
+      <button id="restart-battle" class="primary" type="button" hidden>Play again</button>
+      <span id="controls">Destroy the enemy base before yours falls.</span>
       <nav aria-label="Jump to a base"><button id="player">Player base</button><button id="enemy">Enemy base</button></nav>
     </div>
   </footer>
@@ -54,7 +58,7 @@
     <div class="briefing-body">
       <fieldset>
         <legend>Choose your Captain</legend>
-        <p>You'll directly control this soldier in battle. The Captain is included in your starting roster.</p>
+        <p>Your captain is free. Choose your troops here, then spend any remaining resources on defenses you place on the field.</p>
         <div class="captains">
           <label><input type="radio" name="captain" value="Navy SEAL" required> <span><strong>Navy SEAL</strong><small>All-around soldier</small></span></label>
           <label><input type="radio" name="captain" value="Sniper" required> <span><strong>Sniper</strong><small>Long-range specialist</small></span></label>

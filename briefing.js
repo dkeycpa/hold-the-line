@@ -1,7 +1,7 @@
 const startingResources = 500;
 const catalog = {};
 for (const {name, group, cost} of unitDesigns) {
-  if (group !== 'Captains') (catalog[group] ??= []).push([name, cost]);
+  if (group === 'Soldiers' || group === 'Vehicles') (catalog[group] ??= []).push([name, cost]);
 }
 const room = document.querySelector('#briefing');
 const briefingForm = document.querySelector('#briefing-form');
@@ -42,7 +42,7 @@ function getTotals() {
     spent += rows.get(name).cost * quantity;
     count += quantity;
   }
-  return {left: startingResources - spent, count};
+  return {left: startingResources - defenseCost() - spent, count};
 }
 
 function updateRoster() {
@@ -64,22 +64,27 @@ function changeQuantity(name, change) {
   updateRoster();
 }
 
-document.querySelector('#base-briefing').addEventListener('click', () => {
+function openBriefing() {
   quantities = {...savedRoster.quantities};
   for (const option of briefingForm.elements.captain) {
     option.checked = option.value === savedRoster.captain;
   }
   updateRoster();
   room.showModal();
-});
+}
+document.querySelector('#base-briefing').addEventListener('click', openBriefing);
+document.querySelector('#open-briefing').addEventListener('click', openBriefing);
 
 document.querySelector('#cancel-briefing').addEventListener('click', () => room.close());
 briefingForm.addEventListener('submit', event => {
   event.preventDefault();
   const captain = briefingForm.elements.captain.value;
   savedRoster = {captain, quantities: {...quantities}};
-  const {count} = getTotals();
-  document.querySelector('.heading span').textContent = captain + ' Captain · ' +
-    count + (count === 1 ? ' purchase' : ' purchases') + ' saved';
   room.close();
+  rosterSaved();
 });
+
+function resetRoster() {
+  savedRoster = {captain: '', quantities: {}};
+  quantities = {};
+}

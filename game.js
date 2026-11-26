@@ -22,11 +22,9 @@ let scale = 1;
 let frame = 0;
 let activeUnit;
 const spawnedUnits = [];
-let nextUnitId = 1;
 let lastFrame = null;
 const movement = {KeyW: [0, -1], KeyA: [-1, 0], KeyS: [0, 1], KeyD: [1, 0]};
 const moveKeys = new Set();
-const gruntStatus = document.querySelector('#grunt-status');
 
 function fit(canvas) {
   const width = canvas.clientWidth;
@@ -172,11 +170,11 @@ function drawField(now) {
   for (const [x, offset, type, label] of features) {
     if (x >= camera - 145 && x <= camera + visible + 145) structure(ctx, x, offset, type, label);
   }
-  for (const unit of spawnedUnits) drawBattleUnit(ctx, unit, now, unit === activeUnit);
+  drawBattlefield(ctx, now);
   ctx.restore();
   const [baseX] = features[0];
   const baseEdge = baseX - 89;
-  briefingButton.hidden = baseX + 89 <= camera || baseEdge >= camera + visible;
+  briefingButton.hidden = battlePhase !== 'prepare' || baseX + 89 <= camera || baseEdge >= camera + visible;
   briefingButton.style.left = (baseEdge - camera) * scale + 'px';
   briefingButton.style.top = (roadCenter(baseX) - 72) / depth * height + 'px';
   briefingButton.style.width = 178 * scale + 'px';
@@ -204,7 +202,7 @@ function drawRadar() {
     ctx.fillRect(px - size / 2, py - size / 2, size, size);
   }
   for (const unit of spawnedUnits) {
-    ctx.fillStyle = unit === activeUnit ? '#c2ffed' : '#76c7ae';
+    ctx.fillStyle = unit.side === 'enemy' ? enemy : unit === activeUnit ? '#c2ffed' : '#76c7ae';
     ctx.beginPath();
     ctx.arc(unit.x / world * width, unit.y / depth * height, unit === activeUnit ? 3 : 2, 0, Math.PI * 2);
     ctx.fill();
@@ -273,16 +271,15 @@ function updateUnit(seconds) {
 
 function tickField(now) {
   frame = 0;
-  if (activeUnit && !briefing.open) {
-    updateUnit(lastFrame === null ? 0 : Math.min((now - lastFrame) / 1000, .05));
+  if (battlePhase === 'battle') {
+    const seconds = lastFrame === null ? 0 : Math.min((now - lastFrame) / 1000, .05);
+    if (activeUnit && (moveKeys.size || activeUnit.target || activeUnit.moving)) updateUnit(seconds);
+    updateBattle(seconds, now);
+    drawRadar();
   }
   drawField(now);
-  if (activeUnit && !briefing.open && (moveKeys.size || activeUnit.target || activeUnit.moving || now < activeUnit.flashUntil)) {
-    lastFrame = now;
-    requestDraw();
-  } else {
-    lastFrame = null;
-  }
+  lastFrame = battlePhase === 'battle' ? now : null;
+  if (lastFrame !== null) requestDraw();
 }
 
 function resize() {
@@ -296,98 +293,6 @@ function resize() {
 
 document.querySelector('#player').addEventListener('click', () => pan(0));
 document.querySelector('#enemy').addEventListener('click', () => pan(maxCamera()));
-const spawnType = document.querySelector('#spawn-type');
-const spawnButton = document.querySelector('#spawn-grunt');
-const activeSelect = document.querySelector('#active-unit');
-const fireButton = document.querySelector('#grunt-fire');
-const clearButton = document.querySelector('#clear-units');
-const controls = document.querySelector('#controls');
-for (const group of new Set(unitDesigns.map(unit => unit.group))) {
-  const options = document.createElement('optgroup');
-  options.label = group;
-  for (const design of unitDesigns.filter(unit => unit.group === group)) {
-    options.append(new Option(design.name));
-  }
-  spawnType.append(options);
-}
-spawnType.value = 'Grunt';
-spawnType.addEventListener('change', () => {
-  spawnButton.textContent = 'Spawn ' + spawnType.value;
-});
-
-function selectBattleUnit(unit) {
-  if (activeUnit) {
-    activeUnit.target = null;
-    activeUnit.moving = false;
-    activeUnit.flashUntil = 0;
-  }
-  moveKeys.clear();
-  activeUnit = unit;
-  activeSelect.hidden = !unit;
-  clearButton.hidden = !unit;
-  fireButton.hidden = !unit;
-  if (!unit) {
-    controls.textContent = 'Drag the field or radar · Use arrow keys to pan';
-    drawRadar();
-    requestDraw();
-    return;
-  }
-  const {design} = unit;
-  activeSelect.value = unit.id;
-  fireButton.textContent = design.interval
-    ? (design.group === 'Vehicles' ? 'Test fire' : design.action)
-    : 'Play cue';
-  controls.textContent = design.speed
-    ? 'WASD or tap ground to move · Tap a unit to select'
-    : 'Stationary unit · Tap another unit to select';
-  gruntStatus.textContent = design.name + ' selected' + (design.hp ? ' · ' + design.hp + ' HP' : '');
-  drawRadar();
-  pan(unit.x < camera + 25 || unit.x > camera + visible - 25 ? unit.x - visible / 2 : camera);
-}
-
-spawnButton.addEventListener('click', () => {
-  const design = unitDesigns.find(unit => unit.name === spawnType.value);
-  // Place test units in open slots just beyond the player base.
-  for (let column = 0; column < 10; column++) {
-    for (const offset of [0, -85, 85, -170, 170]) {
-      const x = features[0][0] + 140 + column * 92;
-      const y = roadCenter(features[0][0]) + offset;
-      if (spawnedUnits.some(unit => Math.hypot(unit.x - x, unit.y - y) < 73)) continue;
-      const id = String(nextUnitId++);
-      const unit = {id, design, x, y, facing: 0, distance: 0, target: null,
-        moving: false, flashUntil: 0, nextFire: 0};
-      spawnedUnits.push(unit);
-      activeSelect.append(new Option(design.name + ' ' + id, id));
-      selectBattleUnit(unit);
-      field.focus({preventScroll: true});
-      playGruntSound(design.cue === 'fire' ? 'ready' : design.group === 'Vehicles' || !design.interval ? design.cue : 'ready');
-      return;
-    }
-  }
-  controls.textContent = 'Spawn area full · Move units away or clear the field';
-  gruntStatus.textContent = controls.textContent;
-});
-activeSelect.addEventListener('change', () => {
-  selectBattleUnit(spawnedUnits.find(unit => unit.id === activeSelect.value));
-});
-clearButton.addEventListener('click', () => {
-  spawnedUnits.length = 0;
-  activeSelect.replaceChildren();
-  nextUnitId = 1;
-  selectBattleUnit(null);
-  gruntStatus.textContent = 'Test units cleared.';
-  spawnButton.focus();
-});
-fireButton.addEventListener('click', () => {
-  if (!activeUnit) return;
-  const {design} = activeUnit;
-  const now = performance.now();
-  if (now < activeUnit.nextFire) return;
-  activeUnit.nextFire = now + (design.interval || .55) * 1000;
-  if (design.interval) activeUnit.flashUntil = now + 85;
-  playGruntSound(design.group === 'Vehicles' && design.interval ? 'fire' : design.cue);
-  requestDraw();
-});
 radar.addEventListener('input', () => pan(radar.valueAsNumber));
 
 let radarDrag;
@@ -427,16 +332,13 @@ field.addEventListener('pointermove', event => {
   if (fieldDrag.dragged) pan(fieldDrag.camera + (fieldDrag.x - event.clientX) / scale);
 });
 field.addEventListener('pointerup', event => {
-  if (!activeUnit || fieldDrag?.pointer !== event.pointerId || fieldDrag.dragged) return;
-  const bounds = field.getBoundingClientRect();
-  const x = camera + (event.clientX - bounds.left) / scale;
-  const y = (event.clientY - bounds.top) / bounds.height * depth;
-  const selected = spawnedUnits.findLast(unit => Math.hypot(unit.x - x, unit.y - y) <= 27);
-  if (selected) {
-    selectBattleUnit(selected);
+  if (fieldDrag?.pointer !== event.pointerId || fieldDrag.dragged) return;
+  const {x, y} = fieldPosition(event);
+  if (battlePhase === 'prepare') {
+    placeDefense(x, y);
     return;
   }
-  if (!activeUnit.design.speed) return;
+  if (!activeUnit) return;
   activeUnit.target = {
     x: Math.max(20, Math.min(world - 20, x)),
     y: Math.max(20, Math.min(depth - 20, y)),
