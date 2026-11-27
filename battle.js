@@ -60,6 +60,8 @@ let elapsed = 0;
 let incomeSeconds = 0;
 let nextWave = 0;
 let reinforcementLane = 0;
+let battleCaptain;
+let nextFormationSlot = 0;
 
 function defenseCost() {
   return defenses.reduce((sum, unit) => sum + unit.design.cost, 0);
@@ -109,6 +111,9 @@ function createBattleUnit(design, side, x, y) {
     facing: side === 'player' ? 0 : Math.PI, distance: 0,
     target: null, moving: false, flashUntil: 0, nextFire: 0,
   };
+  if (side === 'player' && design.speed && design.group !== 'Captains') {
+    unit.formationSlot = nextFormationSlot++;
+  }
   spawnedUnits.push(unit);
   return unit;
 }
@@ -173,7 +178,7 @@ function refreshOrders() {
   else if (captainSelected) orderDisplay.textContent = selection + ' · WASD or click to move';
   else {
     const holding = [...selectedUnits].filter(unit => unit.holdPoint).length;
-    const order = holding === count ? 'Holding' : holding === 0 ? 'Advancing' : holding + ' holding';
+    const order = holding === count ? 'Holding' : holding === 0 ? (battleCaptain ? 'Following Captain' : 'Advancing') : holding + ' holding';
     orderDisplay.textContent = selection + ' · ' + order;
   }
 }
@@ -192,6 +197,7 @@ function updateSelection() {
 function resumeAdvance() {
   for (const unit of selectedUnits) {
     unit.holdPoint = null;
+    unit.zonePoint = null;
     unit.target = null;
   }
   choosingHoldPoint = false;
@@ -265,7 +271,56 @@ function handleBattleClick(x, y, addToGroup) {
   }
 }
 
+function commandZone() {
+  if (!battleCaptain || battlePhase !== 'battle') return null;
+  const {rear, front} = savedRoster.zone;
+  return {
+    rear: Math.max(20, battleCaptain.x - rear),
+    front: Math.min(world - 20, battleCaptain.x + front),
+  };
+}
+
+function commandPosition(unit, zone) {
+  const point = unit.zonePoint;
+  // Keep a settled unit in place until a boundary passes it.
+  if (point && point.x >= zone.rear && point.x <= zone.front && (!point.cover || point.cover.hp > 0)) return point;
+
+  const width = zone.front - zone.rear;
+  const column = unit.formationSlot % 6;
+  const row = Math.floor(unit.formationSlot / 6);
+  const x = zone.rear + width * (.52 + .4 * (((column + row) % 6) / 5));
+  const y = 48 + ((column * 76 + row * 34 + battleCaptain.y - depth / 2) % (depth - 96) + depth - 96) % (depth - 96);
+  let coverPoint;
+  let closest = 175;
+  for (const cover of defenses) {
+    if (cover.hp <= 0) continue;
+    const behind = cover.x - 48;
+    if (behind < zone.rear || behind > zone.front) continue;
+    if (spawnedUnits.some(other => other !== unit && other.hp > 0 && other.zonePoint?.cover === cover)) continue;
+    const distance = Math.hypot(behind - x, cover.y - y);
+    if (distance >= closest) continue;
+    closest = distance;
+    coverPoint = {x: behind, y: cover.y, cover};
+  }
+  unit.zonePoint = coverPoint ?? {x, y};
+  return unit.zonePoint;
+}
+
 function drawBattlefield(ctx, now) {
+  const zone = commandZone();
+  if (zone) {
+    ctx.fillStyle = '#94e5cc18';
+    ctx.fillRect(zone.rear, 0, zone.front - zone.rear, depth);
+    ctx.strokeStyle = '#94e5cc';
+    ctx.setLineDash([10, 8]);
+    for (const edge of [zone.rear, zone.front]) {
+      ctx.beginPath();
+      ctx.moveTo(edge, 0);
+      ctx.lineTo(edge, depth);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
   if (battlePhase === 'prepare' && defenseType.value) {
     ctx.fillStyle = '#94e5cc22';
     ctx.fillRect(deploymentEdge, deploymentMargin, deploymentEnd - deploymentEdge, depth - deploymentMargin * 2);
@@ -316,7 +371,8 @@ startBattleButton.addEventListener('click', () => {
   if (battlePhase !== 'prepare' || !savedRoster.captain) return;
   battlePhase = 'battle';
   const captain = unitDesigns.find(({name}) => name === savedRoster.captain);
-  selectedUnits.add(spawnAtBase({...captain, ...captainStats[captain.name]}, 'player', 0));
+  battleCaptain = spawnAtBase({...captain, ...captainStats[captain.name]}, 'player', 0);
+  selectedUnits.add(battleCaptain);
   let slot = 1;
   for (const [name, count] of Object.entries(savedRoster.quantities)) {
     const design = rosterDesigns.find(unit => unit.name === name);
@@ -328,7 +384,7 @@ startBattleButton.addEventListener('click', () => {
   reinforcementControls.hidden = false;
   orderControls.hidden = false;
   updateSelection();
-  battleControls.textContent = 'Click a friendly unit, or use Select Group to pick several. WASD moves the selected captain.';
+  battleControls.textContent = 'Move the Captain to lead your troops. Hold Position overrides the zone. Advance rejoins it.';
   statusDisplay.textContent = 'Battle begun · +' + resourceIncome + ' resources per second';
   refreshResources();
   pan(0);
@@ -396,6 +452,7 @@ function updateBattle(seconds, now) {
     statusDisplay.textContent = 'Enemy wave ' + nextWave + ' of ' + enemyWaves.length + ' deployed';
   }
 
+  const zone = commandZone();
   for (const unit of spawnedUnits) {
     if (unit.hp <= 0) continue;
     const base = bases[unit.side === 'player' ? 1 : 0];
@@ -403,7 +460,9 @@ function updateBattle(seconds, now) {
     const manuallyMoving = unit === activeUnit && (moveKeys.size || unit.target);
     if (manuallyMoving) continue;
     unit.moving = false;
-    if (unit.holdPoint) moveToward(unit, unit.holdPoint.x, unit.holdPoint.y, seconds);
+    const destination = unit.holdPoint ??
+      (zone && unit.formationSlot !== undefined ? commandPosition(unit, zone) : null);
+    if (destination) moveToward(unit, destination.x, destination.y, seconds);
     if (target) {
       unit.facing = Math.atan2(target.y - unit.y, target.x - unit.x);
       if (now >= unit.nextFire) {
@@ -412,14 +471,20 @@ function updateBattle(seconds, now) {
         target.hp = Math.max(0, target.hp - unit.design.damage);
         if (!target.design) refreshHealth();
       }
-    } else if (!unit.holdPoint && unit.design.group !== 'Captains') {
+    } else if (!destination && unit.design.group !== 'Captains') {
       advanceUnit(unit, base, seconds);
     }
   }
 
   for (let index = spawnedUnits.length - 1; index >= 0; index--) {
     if (spawnedUnits[index].hp > 0) continue;
-    if (selectedUnits.delete(spawnedUnits[index])) updateSelection();
+    const fallen = spawnedUnits[index];
+    if (fallen === battleCaptain) {
+      battleCaptain = null;
+      battleControls.textContent = 'The Captain fell. Troops without a Hold Position order advance toward the enemy base.';
+      refreshOrders();
+    }
+    if (selectedUnits.delete(fallen)) updateSelection();
     spawnedUnits.splice(index, 1);
   }
   if (!bases[0].hp || !bases[1].hp) finishBattle();
@@ -450,6 +515,8 @@ restartButton.addEventListener('click', () => {
   defenses.length = 0;
   spawnedUnits.length = 0;
   selectedUnits.clear();
+  battleCaptain = null;
+  nextFormationSlot = 0;
   activeUnit = null;
   bases.forEach(base => { base.hp = baseHealth; });
   resources = startingResources;
@@ -471,3 +538,6 @@ restartButton.addEventListener('click', () => {
 
 refreshResources();
 refreshHealth();
+
+new ResizeObserver(resize).observe(field);
+resize();

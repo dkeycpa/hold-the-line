@@ -202,6 +202,11 @@ function drawRadar() {
     ctx.fillStyle = base ? (x < world / 2 ? player : enemy) : '#d5c8a7';
     ctx.fillRect(px - size / 2, py - size / 2, size, size);
   }
+  const zone = commandZone();
+  if (zone) {
+    ctx.fillStyle = '#94e5cc40';
+    ctx.fillRect(zone.rear / world * width, 0, (zone.front - zone.rear) / world * width, height);
+  }
   for (const unit of spawnedUnits) {
     ctx.fillStyle = unit.side === 'enemy' ? enemy : selectedUnits.has(unit) ? '#c2ffed' : '#76c7ae';
     ctx.beginPath();
@@ -382,8 +387,3 @@ briefingButton.addEventListener('click', () => {
     requestDraw();
   }
 });
-
-new ResizeObserver(resize).observe(field);
-resize();
-
-

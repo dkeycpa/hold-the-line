@@ -127,3 +127,7 @@ footer, .battle-controls, #placement-controls, #reinforcement-controls, #unit-or
 .battle-controls button:disabled { opacity: .45; cursor: default; }
 #controls { flex-basis: 100%; }
 #unit-orders button[aria-pressed="true"] { border-color: #94e5cc; background: #34504e; }
+
+#command-zone-settings { margin-top: 12px; }
+#command-zone-settings label { display: inline-flex; align-items: center; gap: 6px; margin: 4px 12px 4px 0; }
+#command-zone-settings input { width: 6em; padding: 4px; font: inherit; }

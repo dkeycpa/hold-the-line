@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold the Line</title>
-<link rel="stylesheet" href="style.css?v=bcbe4db75e98">
+<link rel="stylesheet" href="style.css?v=c1ebf98bcc72">
 <script defer src="units.js?v=6b8e5fcf9627"></script>
 <script defer src="grunt.js?v=58feda0011fd"></script>
-<script defer src="game.js?v=5de97543511e"></script>
-<script defer src="briefing.js?v=51beefc6931d"></script>
-<script defer src="battle.js?v=7729e45d22c6"></script>
+<script defer src="game.js?v=8d9f7e85d80b"></script>
+<script defer src="briefing.js?v=bd27060e63fe"></script>
+<script defer src="battle.js?v=f0b3c584f617"></script>
 </head>
 <body>
 <main>
@@ -69,6 +69,12 @@
           <label><input type="radio" name="captain" value="Navy SEAL" required> <span><strong>Navy SEAL</strong><small>All-around soldier</small></span></label>
           <label><input type="radio" name="captain" value="Sniper" required> <span><strong>Sniper</strong><small>Long-range specialist</small></span></label>
         </div>
+      </fieldset>
+      <fieldset id="command-zone-settings">
+        <legend>Captain’s command zone</legend>
+        <p>Troops spread out within this zone and move up when the Captain leaves them behind.</p>
+        <label>Distance behind <input name="zoneRear" type="number" min="0" max="1000" step="10" value="180" required></label>
+        <label>Distance ahead <input name="zoneFront" type="number" min="100" max="1200" step="10" value="320" required></label>
       </fieldset>
       <div id="catalog" aria-label="Roster purchases"></div>
     </div>

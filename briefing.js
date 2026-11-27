@@ -9,7 +9,19 @@ const catalogPanel = document.querySelector('#catalog');
 const remaining = document.querySelector('#remaining');
 const rosterSummary = document.querySelector('#roster-summary');
 const rows = new Map();
-let savedRoster = {captain: '', quantities: {}};
+const zoneDefaults = {'Navy SEAL': {rear: 180, front: 320}, Sniper: {rear: 80, front: 500}};
+const zoneRear = briefingForm.elements.zoneRear;
+const zoneFront = briefingForm.elements.zoneFront;
+let savedRoster = {captain: '', quantities: {}, zone: null};
+
+function showZoneSettings({rear, front}) {
+  zoneRear.value = rear;
+  zoneFront.value = front;
+}
+
+briefingForm.addEventListener('change', event => {
+  if (event.target.name === 'captain') showZoneSettings(zoneDefaults[event.target.value]);
+});
 let quantities = {};
 
 for (const [category, items] of Object.entries(catalog)) {
@@ -69,6 +81,7 @@ function openBriefing() {
   for (const option of briefingForm.elements.captain) {
     option.checked = option.value === savedRoster.captain;
   }
+  showZoneSettings(savedRoster.zone ?? zoneDefaults['Navy SEAL']);
   updateRoster();
   room.showModal();
 }
@@ -79,12 +92,15 @@ document.querySelector('#cancel-briefing').addEventListener('click', () => room.
 briefingForm.addEventListener('submit', event => {
   event.preventDefault();
   const captain = briefingForm.elements.captain.value;
-  savedRoster = {captain, quantities: {...quantities}};
+  savedRoster = {
+    captain, quantities: {...quantities},
+    zone: {rear: zoneRear.valueAsNumber, front: zoneFront.valueAsNumber},
+  };
   room.close();
   rosterSaved();
 });
 
 function resetRoster() {
-  savedRoster = {captain: '', quantities: {}};
+  savedRoster = {captain: '', quantities: {}, zone: null};
   quantities = {};
 }
