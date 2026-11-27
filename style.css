@@ -126,4 +126,4 @@ footer, .battle-controls, #placement-controls, #reinforcement-controls, #unit-or
 .battle-controls select:focus-visible { outline: 2px solid #ffe5a3; }
 .battle-controls button:disabled { opacity: .45; cursor: default; }
 #controls { flex-basis: 100%; }
-#hold-position[aria-pressed="true"] { border-color: #94e5cc; background: #34504e; }
+#unit-orders button[aria-pressed="true"] { border-color: #94e5cc; background: #34504e; }

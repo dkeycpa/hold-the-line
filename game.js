@@ -21,6 +21,7 @@ let visible = 0;
 let scale = 1;
 let frame = 0;
 let activeUnit;
+const movementSpeed = .5;
 const spawnedUnits = [];
 let lastFrame = null;
 const movement = {KeyW: [0, -1], KeyA: [-1, 0], KeyS: [0, 1], KeyD: [1, 0]};
@@ -202,9 +203,9 @@ function drawRadar() {
     ctx.fillRect(px - size / 2, py - size / 2, size, size);
   }
   for (const unit of spawnedUnits) {
-    ctx.fillStyle = unit.side === 'enemy' ? enemy : unit === activeUnit ? '#c2ffed' : '#76c7ae';
+    ctx.fillStyle = unit.side === 'enemy' ? enemy : selectedUnits.has(unit) ? '#c2ffed' : '#76c7ae';
     ctx.beginPath();
-    ctx.arc(unit.x / world * width, unit.y / depth * height, unit === activeUnit ? 3 : 2, 0, Math.PI * 2);
+    ctx.arc(unit.x / world * width, unit.y / depth * height, selectedUnits.has(unit) ? 3 : 2, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -243,7 +244,7 @@ function updateUnit(seconds) {
     dy = activeUnit.target.y - activeUnit.y;
   }
   const length = Math.hypot(dx, dy);
-  const stride = activeUnit.design.speed * seconds;
+  const stride = activeUnit.design.speed * movementSpeed * seconds;
   activeUnit.moving = false;
   if (activeUnit.target && length === 0) activeUnit.target = null;
   if (!length || !stride) return;
@@ -338,7 +339,7 @@ field.addEventListener('pointerup', event => {
     placeDefense(x, y);
     return;
   }
-  if (battlePhase === 'battle') handleBattleClick(x, y);
+  if (battlePhase === 'battle') handleBattleClick(x, y, event.shiftKey);
 });
 field.addEventListener('lostpointercapture', event => {
   if (fieldDrag?.pointer !== event.pointerId) return;

@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold the Line</title>
-<link rel="stylesheet" href="style.css?v=d4fe51151fe2">
+<link rel="stylesheet" href="style.css?v=bcbe4db75e98">
 <script defer src="units.js?v=6b8e5fcf9627"></script>
 <script defer src="grunt.js?v=1cb60593f913"></script>
-<script defer src="game.js?v=816fb2b54cae"></script>
+<script defer src="game.js?v=42a213959a39"></script>
 <script defer src="briefing.js?v=51beefc6931d"></script>
-<script defer src="battle.js?v=4842c3818cf1"></script>
+<script defer src="battle.js?v=e0b35ed52d83"></script>
 </head>
 <body>
 <main>
@@ -38,6 +38,7 @@
       <button id="start-battle" class="primary" type="button" disabled>Start Battle</button>
       <div id="unit-orders" hidden>
         <span id="selected-order" role="status"></span>
+        <button id="select-group" type="button" aria-pressed="false">Select Group</button>
         <button id="hold-position" type="button" aria-pressed="false">Hold Position</button>
         <button id="advance-unit" type="button">Advance</button>
       </div>

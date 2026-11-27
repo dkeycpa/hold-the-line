@@ -30,6 +30,7 @@ const undoDefenseButton = document.querySelector('#undo-defense');
 const startBattleButton = document.querySelector('#start-battle');
 const orderControls = document.querySelector('#unit-orders');
 const orderDisplay = document.querySelector('#selected-order');
+const groupButton = document.querySelector('#select-group');
 const holdButton = document.querySelector('#hold-position');
 const advanceButton = document.querySelector('#advance-unit');
 const reinforcementControls = document.querySelector('#reinforcement-controls');
@@ -51,7 +52,9 @@ const bases = [
 const defenses = [];
 let battlePhase = 'prepare';
 let placementPoint;
+const selectedUnits = new Set();
 let choosingHoldPoint = false;
+let selectingGroup = false;
 let resources = startingResources;
 let elapsed = 0;
 let incomeSeconds = 0;
@@ -157,43 +160,83 @@ undoDefenseButton.addEventListener('click', () => {
 });
 
 function refreshOrders() {
-  holdButton.disabled = !activeUnit;
-  advanceButton.disabled = !activeUnit || (!activeUnit.holdPoint && !choosingHoldPoint);
+  const count = selectedUnits.size;
+  holdButton.disabled = count === 0;
+  advanceButton.disabled = !choosingHoldPoint && ![...selectedUnits].some(unit => unit.holdPoint);
   holdButton.setAttribute('aria-pressed', choosingHoldPoint);
-  if (!activeUnit) {
-    orderDisplay.textContent = 'Select a friendly unit';
-    return;
+  groupButton.setAttribute('aria-pressed', selectingGroup);
+  const selection = count === 1 ? activeUnit.design.name : count + ' units selected';
+  if (choosingHoldPoint) orderDisplay.textContent = selection + ' · Click where to hold';
+  else if (selectingGroup) orderDisplay.textContent = selection + ' · Click units to add or remove';
+  else if (count === 0) orderDisplay.textContent = 'Select a friendly unit';
+  else {
+    const holding = [...selectedUnits].filter(unit => unit.holdPoint).length;
+    const order = holding === count ? 'Holding' : holding === 0 ? 'Advancing' : holding + ' holding';
+    orderDisplay.textContent = selection + ' · ' + order;
   }
-  const order = choosingHoldPoint ? 'Click where to hold' : activeUnit.holdPoint ? 'Hold Position' : 'Advance';
-  orderDisplay.textContent = activeUnit.design.name + ' · ' + order;
 }
 
-function resumeAdvance() {
-  if (!activeUnit) return;
-  activeUnit.holdPoint = null;
-  activeUnit.target = null;
-  choosingHoldPoint = false;
+function updateSelection() {
+  const singleUnit = selectedUnits.size === 1 ? selectedUnits.values().next().value : null;
+  if (activeUnit !== singleUnit) {
+    if (activeUnit) activeUnit.target = null;
+    moveKeys.clear();
+    activeUnit = singleUnit;
+  }
+  if (!selectedUnits.size) choosingHoldPoint = false;
   refreshOrders();
 }
 
+function resumeAdvance() {
+  for (const unit of selectedUnits) {
+    unit.holdPoint = null;
+    unit.target = null;
+  }
+  choosingHoldPoint = false;
+  selectingGroup = false;
+  refreshOrders();
+}
+
+groupButton.addEventListener('click', () => {
+  selectingGroup = !selectingGroup;
+  choosingHoldPoint = false;
+  refreshOrders();
+});
 holdButton.addEventListener('click', () => {
-  if (!activeUnit) return;
+  if (!selectedUnits.size) return;
   choosingHoldPoint = !choosingHoldPoint;
+  selectingGroup = false;
   refreshOrders();
 });
 advanceButton.addEventListener('click', resumeAdvance);
 
-function handleBattleClick(x, y) {
-  const point = {
-    x: Math.max(20, Math.min(world - 20, x)),
-    y: Math.max(20, Math.min(depth - 20, y)),
-  };
-  if (choosingHoldPoint && activeUnit) {
-    activeUnit.target = null;
-    activeUnit.holdPoint = point;
-    moveKeys.clear();
-    choosingHoldPoint = false;
-    refreshOrders();
+function setHoldPosition(x, y) {
+  const spacing = 48;
+  const columns = Math.min(4, selectedUnits.size);
+  const rows = Math.ceil(selectedUnits.size / columns);
+  const halfWidth = (columns - 1) * spacing / 2;
+  const centerX = Math.max(20 + halfWidth, Math.min(world - 20 - halfWidth, x));
+  // Keep even large groups inside the playable depth.
+  const rowSpacing = rows > 1 ? Math.min(spacing, (depth - 40) / (rows - 1)) : 0;
+  const verticalMargin = (rows - 1) * rowSpacing / 2;
+  const centerY = Math.max(20 + verticalMargin, Math.min(depth - 20 - verticalMargin, y));
+  let slot = 0;
+  for (const unit of selectedUnits) {
+    unit.target = null;
+    unit.holdPoint = {
+      x: centerX + (slot % columns) * spacing - halfWidth,
+      y: centerY + Math.floor(slot / columns) * rowSpacing - verticalMargin,
+    };
+    slot++;
+  }
+  moveKeys.clear();
+  choosingHoldPoint = false;
+  refreshOrders();
+}
+
+function handleBattleClick(x, y, addToGroup) {
+  if (choosingHoldPoint && selectedUnits.size) {
+    setHoldPosition(x, y);
     return;
   }
 
@@ -207,12 +250,14 @@ function handleBattleClick(x, y) {
     selected = unit;
   }
   if (selected) {
-    if (activeUnit && activeUnit !== selected) activeUnit.target = null;
-    moveKeys.clear();
-    activeUnit = selected;
-    refreshOrders();
-  } else if (activeUnit?.design.group === 'Captains' && !activeUnit.holdPoint) {
-    activeUnit.target = point;
+    if (!selectingGroup && !addToGroup) selectedUnits.clear();
+    if (!selectedUnits.delete(selected)) selectedUnits.add(selected);
+    updateSelection();
+  } else if (!selectingGroup && !addToGroup && activeUnit?.design.group === 'Captains' && !activeUnit.holdPoint) {
+    activeUnit.target = {
+      x: Math.max(20, Math.min(world - 20, x)),
+      y: Math.max(20, Math.min(depth - 20, y)),
+    };
   }
 }
 
@@ -233,8 +278,9 @@ function drawBattlefield(ctx, now) {
       ctx.stroke();
     }
   }
-  if (battlePhase === 'battle' && activeUnit?.holdPoint) {
-    const {x, y} = activeUnit.holdPoint;
+  for (const unit of selectedUnits) {
+    if (battlePhase !== 'battle' || !unit.holdPoint) continue;
+    const {x, y} = unit.holdPoint;
     ctx.strokeStyle = player;
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 4]);
@@ -245,7 +291,7 @@ function drawBattlefield(ctx, now) {
   }
   for (const unit of spawnedUnits) {
     if (unit.x < camera - 55 || unit.x > camera + visible + 55) continue;
-    drawBattleUnit(ctx, unit, now, unit === activeUnit);
+    drawBattleUnit(ctx, unit, now, selectedUnits.has(unit));
     if (battlePhase === 'prepare') continue;
     ctx.fillStyle = '#182426';
     ctx.fillRect(unit.x - 18, unit.y - 31, 36, 5);
@@ -266,7 +312,7 @@ startBattleButton.addEventListener('click', () => {
   if (battlePhase !== 'prepare' || !savedRoster.captain) return;
   battlePhase = 'battle';
   const captain = unitDesigns.find(({name}) => name === savedRoster.captain);
-  activeUnit = spawnAtBase({...captain, ...captainStats[captain.name]}, 'player', 0);
+  selectedUnits.add(spawnAtBase({...captain, ...captainStats[captain.name]}, 'player', 0));
   let slot = 1;
   for (const [name, count] of Object.entries(savedRoster.quantities)) {
     const design = rosterDesigns.find(unit => unit.name === name);
@@ -277,8 +323,8 @@ startBattleButton.addEventListener('click', () => {
   startBattleButton.hidden = true;
   reinforcementControls.hidden = false;
   orderControls.hidden = false;
-  refreshOrders();
-  battleControls.textContent = 'Click a friendly unit to give orders. Use WASD to move your selected captain.';
+  updateSelection();
+  battleControls.textContent = 'Click a friendly unit, or use Select Group to pick several. WASD moves the selected captain.';
   statusDisplay.textContent = 'Battle begun · +' + resourceIncome + ' resources per second';
   refreshResources();
   pan(0);
@@ -319,7 +365,7 @@ function moveToward(unit, x, y, seconds) {
   const dx = x - unit.x;
   const dy = y - unit.y;
   const distance = Math.hypot(dx, dy);
-  const step = Math.min(distance, unit.design.speed * seconds * 1.65);
+  const step = Math.min(distance, unit.design.speed * movementSpeed * seconds * 1.65);
   if (!step) return;
   unit.facing = Math.atan2(dy, dx);
   unit.x = step === distance ? x : unit.x + dx / distance * step;
@@ -369,12 +415,7 @@ function updateBattle(seconds, now) {
 
   for (let index = spawnedUnits.length - 1; index >= 0; index--) {
     if (spawnedUnits[index].hp > 0) continue;
-    if (spawnedUnits[index] === activeUnit) {
-      activeUnit = null;
-      moveKeys.clear();
-      choosingHoldPoint = false;
-      refreshOrders();
-    }
+    if (selectedUnits.delete(spawnedUnits[index])) updateSelection();
     spawnedUnits.splice(index, 1);
   }
   if (!bases[0].hp || !bases[1].hp) finishBattle();
@@ -387,6 +428,7 @@ function finishBattle() {
   reinforcementControls.hidden = true;
   orderControls.hidden = true;
   choosingHoldPoint = false;
+  selectingGroup = false;
   restartButton.hidden = false;
   if (!bases[0].hp && !bases[1].hp) {
     statusDisplay.textContent = 'Draw · both bases fell';
@@ -403,6 +445,7 @@ restartButton.addEventListener('click', () => {
   resetRoster();
   defenses.length = 0;
   spawnedUnits.length = 0;
+  selectedUnits.clear();
   activeUnit = null;
   bases.forEach(base => { base.hp = baseHealth; });
   resources = startingResources;
