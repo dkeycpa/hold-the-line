@@ -2,6 +2,8 @@ const playerBaseX = features[0][0];
 const enemyBaseX = features[1][0];
 const baseHealth = 500;
 const resourceIncome = 12;
+const enemyResourceIncome = 7;
+const enemyStartingResources = 120;
 const deploymentEdge = playerBaseX + 220;
 const deploymentEnd = world / 2 - 80;
 const deploymentMargin = 55;
@@ -11,12 +13,15 @@ const captainStats = {
   'Navy SEAL': {hp: 180, range: 205, damage: 18},
   Sniper: {hp: 120, range: 345, damage: 55},
 };
-const enemyWaves = [
-  {time: 0, roster: ['Grunt', 'Grunt', 'Grunt']},
-  {time: 13, roster: ['Grunt', 'Grunt', 'Grenadier', 'Heavy']},
-  {time: 26, roster: ['Grunt', 'Heavy', 'Jeep', 'Jeep']},
-  {time: 42, roster: ['Heavy', 'Heavy', 'Grenadier', 'Jeep', 'Speeder']},
-];
+const enemyPlatoons = [
+  ['Grunt', 'Grunt', 'Grunt', 'Heavy'],
+  ['Grunt', 'Grunt', 'Heavy', 'Grenadier'],
+  ['Grunt', 'Heavy', 'Grenadier', 'Jeep'],
+  ['Grunt', 'Heavy', 'Heavy', 'Jeep', 'Speeder'],
+].map(names => {
+  const roster = names.map(name => rosterDesigns.find(unit => unit.name === name));
+  return {roster, cost: roster.reduce((total, unit) => total + unit.cost, 0)};
+});
 
 const statusDisplay = document.querySelector('#battle-status');
 const resourceDisplay = document.querySelector('#battle-resources');
@@ -58,7 +63,8 @@ let selectingGroup = false;
 let resources = startingResources;
 let elapsed = 0;
 let incomeSeconds = 0;
-let nextWave = 0;
+let enemyResources = enemyStartingResources;
+let deployedPlatoons = 0;
 let reinforcementLane = 0;
 let battleCaptain;
 let nextFormationSlot = 0;
@@ -438,18 +444,20 @@ function updateBattle(seconds, now) {
   elapsed += seconds;
   const wholeSeconds = Math.floor(elapsed + 1e-8);
   if (wholeSeconds > incomeSeconds) {
-    resources += (wholeSeconds - incomeSeconds) * resourceIncome;
+    const secondsEarned = wholeSeconds - incomeSeconds;
+    resources += secondsEarned * resourceIncome;
+    enemyResources += secondsEarned * enemyResourceIncome;
     incomeSeconds = wholeSeconds;
     refreshResources();
   }
 
-  const wave = enemyWaves[nextWave];
-  if (wave && elapsed >= wave.time) {
-    wave.roster.forEach((name, slot) => {
-      spawnAtBase(rosterDesigns.find(unit => unit.name === name), 'enemy', slot);
-    });
-    nextWave++;
-    statusDisplay.textContent = 'Enemy wave ' + nextWave + ' of ' + enemyWaves.length + ' deployed';
+  const platoon = enemyPlatoons[deployedPlatoons % enemyPlatoons.length];
+  if (enemyResources >= platoon.cost) {
+    enemyResources -= platoon.cost;
+    platoon.roster.forEach((design, slot) => spawnAtBase(design, 'enemy', slot));
+    deployedPlatoons++;
+    statusDisplay.textContent = 'Enemy platoon ' + deployedPlatoons + ' deployed · ' +
+      platoon.roster.length + ' units';
   }
 
   const zone = commandZone();
@@ -520,7 +528,8 @@ restartButton.addEventListener('click', () => {
   activeUnit = null;
   bases.forEach(base => { base.hp = baseHealth; });
   resources = startingResources;
-  elapsed = incomeSeconds = nextWave = reinforcementLane = 0;
+  elapsed = incomeSeconds = deployedPlatoons = reinforcementLane = 0;
+  enemyResources = enemyStartingResources;
   defenseType.value = '';
   placementPoint = null;
   openBriefingButton.hidden = false;
