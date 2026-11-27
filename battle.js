@@ -278,7 +278,7 @@ function handleBattleClick(x, y, addToGroup) {
 }
 
 function commandZone() {
-  if (!battleCaptain || battlePhase !== 'battle') return null;
+  if (!battleCaptain || battleCaptain.hp <= 0 || battlePhase !== 'battle') return null;
   const {rear, front} = savedRoster.zone;
   return {
     rear: Math.max(20, battleCaptain.x - rear),
@@ -464,13 +464,22 @@ function updateBattle(seconds, now) {
   for (const unit of spawnedUnits) {
     if (unit.hp <= 0) continue;
     const base = bases[unit.side === 'player' ? 1 : 0];
-    const target = unit.design.damage ? findTarget(unit, base) : null;
     const manuallyMoving = unit === activeUnit && (moveKeys.size || unit.target);
     if (manuallyMoving) continue;
     unit.moving = false;
-    const destination = unit.holdPoint ??
-      (zone && unit.formationSlot !== undefined ? commandPosition(unit, zone) : null);
-    if (destination) moveToward(unit, destination.x, destination.y, seconds);
+    let target = unit.design.damage ? findTarget(unit, base) : null;
+    const attacker = unit.attacker;
+    let destination = unit.holdPoint;
+    if (!destination && unit.formationSlot !== undefined) {
+      const underFire = unit.design.damage && attacker?.hp > 0 &&
+        Math.hypot(attacker.x - unit.x, attacker.y - unit.y) <= attacker.design.range + 40;
+      if (underFire) destination = target ? null : attacker;
+      else if (zone) destination = commandPosition(unit, zone);
+    }
+    if (destination) {
+      moveToward(unit, destination.x, destination.y, seconds);
+      if (unit.design.damage) target = findTarget(unit, base);
+    }
     if (target) {
       unit.facing = Math.atan2(target.y - unit.y, target.x - unit.x);
       if (now >= unit.nextFire) {
@@ -478,6 +487,7 @@ function updateBattle(seconds, now) {
         unit.flashUntil = now + 85;
         target.hp = Math.max(0, target.hp - unit.design.damage);
         if (!target.design) refreshHealth();
+        else if (target.formationSlot !== undefined) target.attacker = unit;
       }
     } else if (!destination && unit.design.group !== 'Captains') {
       advanceUnit(unit, base, seconds);
