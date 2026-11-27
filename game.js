@@ -273,7 +273,7 @@ function tickField(now) {
   frame = 0;
   if (battlePhase === 'battle') {
     const seconds = lastFrame === null ? 0 : Math.min((now - lastFrame) / 1000, .05);
-    if (activeUnit && (moveKeys.size || activeUnit.target || activeUnit.moving)) updateUnit(seconds);
+    if (activeUnit && (moveKeys.size || activeUnit.target)) updateUnit(seconds);
     updateBattle(seconds, now);
     drawRadar();
   }
@@ -338,12 +338,7 @@ field.addEventListener('pointerup', event => {
     placeDefense(x, y);
     return;
   }
-  if (!activeUnit) return;
-  activeUnit.target = {
-    x: Math.max(20, Math.min(world - 20, x)),
-    y: Math.max(20, Math.min(depth - 20, y)),
-  };
-  requestDraw();
+  if (battlePhase === 'battle') handleBattleClick(x, y);
 });
 field.addEventListener('lostpointercapture', event => {
   if (fieldDrag?.pointer !== event.pointerId) return;
@@ -360,8 +355,9 @@ field.addEventListener('wheel', event => {
 
 document.addEventListener('keydown', event => {
   if (briefing.open || event.altKey || event.metaKey || event.ctrlKey) return;
-  if (activeUnit?.design.speed && Object.hasOwn(movement, event.code)) {
+  if (activeUnit?.design.group === 'Captains' && Object.hasOwn(movement, event.code)) {
     event.preventDefault();
+    if (activeUnit.holdPoint || choosingHoldPoint) resumeAdvance();
     moveKeys.add(event.code);
     activeUnit.target = null;
     requestDraw();

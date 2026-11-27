@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold the Line</title>
-<link rel="stylesheet" href="style.css?v=c94378dc56e5">
+<link rel="stylesheet" href="style.css?v=d4fe51151fe2">
 <script defer src="units.js?v=6b8e5fcf9627"></script>
 <script defer src="grunt.js?v=1cb60593f913"></script>
-<script defer src="game.js?v=21fff7d22fa9"></script>
+<script defer src="game.js?v=816fb2b54cae"></script>
 <script defer src="briefing.js?v=51beefc6931d"></script>
-<script defer src="battle.js?v=36b2d44dfb65"></script>
+<script defer src="battle.js?v=4842c3818cf1"></script>
 </head>
 <body>
 <main>
@@ -36,6 +36,11 @@
         <button id="undo-defense" type="button" disabled>Undo placement</button>
       </div>
       <button id="start-battle" class="primary" type="button" disabled>Start Battle</button>
+      <div id="unit-orders" hidden>
+        <span id="selected-order" role="status"></span>
+        <button id="hold-position" type="button" aria-pressed="false">Hold Position</button>
+        <button id="advance-unit" type="button">Advance</button>
+      </div>
       <div id="reinforcement-controls" hidden>
         <select id="reinforcement-type" aria-label="Reinforcement to recruit"></select>
         <button id="recruit-unit" type="button">Recruit</button>

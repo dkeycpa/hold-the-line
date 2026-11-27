@@ -28,6 +28,10 @@ const placementControls = document.querySelector('#placement-controls');
 const defenseType = document.querySelector('#defense-type');
 const undoDefenseButton = document.querySelector('#undo-defense');
 const startBattleButton = document.querySelector('#start-battle');
+const orderControls = document.querySelector('#unit-orders');
+const orderDisplay = document.querySelector('#selected-order');
+const holdButton = document.querySelector('#hold-position');
+const advanceButton = document.querySelector('#advance-unit');
 const reinforcementControls = document.querySelector('#reinforcement-controls');
 const reinforcementType = document.querySelector('#reinforcement-type');
 const recruitButton = document.querySelector('#recruit-unit');
@@ -47,6 +51,7 @@ const bases = [
 const defenses = [];
 let battlePhase = 'prepare';
 let placementPoint;
+let choosingHoldPoint = false;
 let resources = startingResources;
 let elapsed = 0;
 let incomeSeconds = 0;
@@ -151,6 +156,66 @@ undoDefenseButton.addEventListener('click', () => {
   requestDraw();
 });
 
+function refreshOrders() {
+  holdButton.disabled = !activeUnit;
+  advanceButton.disabled = !activeUnit || (!activeUnit.holdPoint && !choosingHoldPoint);
+  holdButton.setAttribute('aria-pressed', choosingHoldPoint);
+  if (!activeUnit) {
+    orderDisplay.textContent = 'Select a friendly unit';
+    return;
+  }
+  const order = choosingHoldPoint ? 'Click where to hold' : activeUnit.holdPoint ? 'Hold Position' : 'Advance';
+  orderDisplay.textContent = activeUnit.design.name + ' · ' + order;
+}
+
+function resumeAdvance() {
+  if (!activeUnit) return;
+  activeUnit.holdPoint = null;
+  activeUnit.target = null;
+  choosingHoldPoint = false;
+  refreshOrders();
+}
+
+holdButton.addEventListener('click', () => {
+  if (!activeUnit) return;
+  choosingHoldPoint = !choosingHoldPoint;
+  refreshOrders();
+});
+advanceButton.addEventListener('click', resumeAdvance);
+
+function handleBattleClick(x, y) {
+  const point = {
+    x: Math.max(20, Math.min(world - 20, x)),
+    y: Math.max(20, Math.min(depth - 20, y)),
+  };
+  if (choosingHoldPoint && activeUnit) {
+    activeUnit.target = null;
+    activeUnit.holdPoint = point;
+    moveKeys.clear();
+    choosingHoldPoint = false;
+    refreshOrders();
+    return;
+  }
+
+  let selected;
+  let closest = 28;
+  for (const unit of spawnedUnits) {
+    if (unit.side !== 'player' || !unit.design.speed) continue;
+    const distance = Math.hypot(unit.x - x, unit.y - y);
+    if (distance > closest) continue;
+    closest = distance;
+    selected = unit;
+  }
+  if (selected) {
+    if (activeUnit && activeUnit !== selected) activeUnit.target = null;
+    moveKeys.clear();
+    activeUnit = selected;
+    refreshOrders();
+  } else if (activeUnit?.design.group === 'Captains' && !activeUnit.holdPoint) {
+    activeUnit.target = point;
+  }
+}
+
 function drawBattlefield(ctx, now) {
   if (battlePhase === 'prepare' && defenseType.value) {
     ctx.fillStyle = '#94e5cc22';
@@ -167,6 +232,16 @@ function drawBattlefield(ctx, now) {
       ctx.arc(x, y, 29, 0, 2 * Math.PI);
       ctx.stroke();
     }
+  }
+  if (battlePhase === 'battle' && activeUnit?.holdPoint) {
+    const {x, y} = activeUnit.holdPoint;
+    ctx.strokeStyle = player;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(x, y, 26, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
   for (const unit of spawnedUnits) {
     if (unit.x < camera - 55 || unit.x > camera + visible + 55) continue;
@@ -201,7 +276,9 @@ startBattleButton.addEventListener('click', () => {
   placementControls.hidden = true;
   startBattleButton.hidden = true;
   reinforcementControls.hidden = false;
-  battleControls.textContent = 'Troops advance automatically. Use WASD or click the field to guide your captain.';
+  orderControls.hidden = false;
+  refreshOrders();
+  battleControls.textContent = 'Click a friendly unit to give orders. Use WASD to move your selected captain.';
   statusDisplay.textContent = 'Battle begun · +' + resourceIncome + ' resources per second';
   refreshResources();
   pan(0);
@@ -235,14 +312,18 @@ function findTarget(unit, opposingBase) {
 
 function advanceUnit(unit, base, seconds) {
   const destinationY = Math.abs(base.x - unit.x) < 340 ? base.y : unit.lane;
-  const dx = base.x - unit.x;
-  const dy = destinationY - unit.y;
+  moveToward(unit, base.x, destinationY, seconds);
+}
+
+function moveToward(unit, x, y, seconds) {
+  const dx = x - unit.x;
+  const dy = y - unit.y;
   const distance = Math.hypot(dx, dy);
   const step = Math.min(distance, unit.design.speed * seconds * 1.65);
   if (!step) return;
   unit.facing = Math.atan2(dy, dx);
-  unit.x += dx / distance * step;
-  unit.y += dy / distance * step;
+  unit.x = step === distance ? x : unit.x + dx / distance * step;
+  unit.y = step === distance ? y : unit.y + dy / distance * step;
   unit.distance += step;
   unit.moving = true;
 }
@@ -272,6 +353,7 @@ function updateBattle(seconds, now) {
     const manuallyMoving = unit === activeUnit && (moveKeys.size || unit.target);
     if (manuallyMoving) continue;
     unit.moving = false;
+    if (unit.holdPoint) moveToward(unit, unit.holdPoint.x, unit.holdPoint.y, seconds);
     if (target) {
       unit.facing = Math.atan2(target.y - unit.y, target.x - unit.x);
       if (now >= unit.nextFire) {
@@ -280,7 +362,7 @@ function updateBattle(seconds, now) {
         target.hp = Math.max(0, target.hp - unit.design.damage);
         if (!target.design) refreshHealth();
       }
-    } else {
+    } else if (!unit.holdPoint) {
       advanceUnit(unit, base, seconds);
     }
   }
@@ -290,7 +372,8 @@ function updateBattle(seconds, now) {
     if (spawnedUnits[index] === activeUnit) {
       activeUnit = null;
       moveKeys.clear();
-      battleControls.textContent = 'Your captain fell. You can still recruit reinforcements.';
+      choosingHoldPoint = false;
+      refreshOrders();
     }
     spawnedUnits.splice(index, 1);
   }
@@ -302,6 +385,8 @@ function finishBattle() {
   if (activeUnit) activeUnit.target = null;
   moveKeys.clear();
   reinforcementControls.hidden = true;
+  orderControls.hidden = true;
+  choosingHoldPoint = false;
   restartButton.hidden = false;
   if (!bases[0].hp && !bases[1].hp) {
     statusDisplay.textContent = 'Draw · both bases fell';

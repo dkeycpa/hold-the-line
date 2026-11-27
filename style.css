@@ -108,7 +108,7 @@ small { display: block; color: #bacac5; font-size: .8rem; }
 .primary:hover { background: #b5f1e0; }
 @media (max-width: 550px) { #catalog { grid-template-columns: 1fr; } }
 
-footer, .battle-controls, #placement-controls, #reinforcement-controls {
+footer, .battle-controls, #placement-controls, #reinforcement-controls, #unit-orders {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -126,3 +126,4 @@ footer, .battle-controls, #placement-controls, #reinforcement-controls {
 .battle-controls select:focus-visible { outline: 2px solid #ffe5a3; }
 .battle-controls button:disabled { opacity: .45; cursor: default; }
 #controls { flex-basis: 100%; }
+#hold-position[aria-pressed="true"] { border-color: #94e5cc; background: #34504e; }
