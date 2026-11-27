@@ -358,7 +358,6 @@ document.addEventListener('keydown', event => {
   if (briefing.open || event.altKey || event.metaKey || event.ctrlKey) return;
   if (activeUnit?.design.group === 'Captains' && Object.hasOwn(movement, event.code)) {
     event.preventDefault();
-    if (activeUnit.holdPoint || choosingHoldPoint) resumeAdvance();
     moveKeys.add(event.code);
     activeUnit.target = null;
     requestDraw();

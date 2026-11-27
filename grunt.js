@@ -50,6 +50,8 @@ function playGruntSound(cue) {
   }
 }
 
+const captainScale = 1.25;
+
 function drawBattleUnit(ctx, unit, now, selected) {
   function ellipse(color, x, y, rx, ry) {
     ctx.fillStyle = color;
@@ -71,6 +73,7 @@ function drawBattleUnit(ctx, unit, now, selected) {
   }
   ctx.save();
   ctx.translate(unit.x, unit.y);
+  if (unit.design.group === 'Captains') ctx.scale(captainScale, captainScale);
   ellipse('#302e28aa', 3, 4, 18, 14);
   if (selected) {
     ctx.strokeStyle = '#baf4e2';

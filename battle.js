@@ -161,7 +161,8 @@ undoDefenseButton.addEventListener('click', () => {
 
 function refreshOrders() {
   const count = selectedUnits.size;
-  holdButton.disabled = count === 0;
+  const captainSelected = activeUnit?.design.group === 'Captains';
+  holdButton.disabled = count === 0 || captainSelected;
   advanceButton.disabled = !choosingHoldPoint && ![...selectedUnits].some(unit => unit.holdPoint);
   holdButton.setAttribute('aria-pressed', choosingHoldPoint);
   groupButton.setAttribute('aria-pressed', selectingGroup);
@@ -169,6 +170,7 @@ function refreshOrders() {
   if (choosingHoldPoint) orderDisplay.textContent = selection + ' · Click where to hold';
   else if (selectingGroup) orderDisplay.textContent = selection + ' · Click units to add or remove';
   else if (count === 0) orderDisplay.textContent = 'Select a friendly unit';
+  else if (captainSelected) orderDisplay.textContent = selection + ' · WASD or click to move';
   else {
     const holding = [...selectedUnits].filter(unit => unit.holdPoint).length;
     const order = holding === count ? 'Holding' : holding === 0 ? 'Advancing' : holding + ' holding';
@@ -203,7 +205,7 @@ groupButton.addEventListener('click', () => {
   refreshOrders();
 });
 holdButton.addEventListener('click', () => {
-  if (!selectedUnits.size) return;
+  if (holdButton.disabled) return;
   choosingHoldPoint = !choosingHoldPoint;
   selectingGroup = false;
   refreshOrders();
@@ -240,20 +242,22 @@ function handleBattleClick(x, y, addToGroup) {
     return;
   }
 
+  const grouping = selectingGroup || addToGroup;
   let selected;
-  let closest = 28;
+  let closest = Infinity;
   for (const unit of spawnedUnits) {
-    if (unit.side !== 'player' || !unit.design.speed) continue;
+    const captain = unit.design.group === 'Captains';
+    if (unit.side !== 'player' || !unit.design.speed || (grouping && captain)) continue;
     const distance = Math.hypot(unit.x - x, unit.y - y);
-    if (distance > closest) continue;
+    if (distance > closest || distance > (captain ? 28 * captainScale : 28)) continue;
     closest = distance;
     selected = unit;
   }
   if (selected) {
-    if (!selectingGroup && !addToGroup) selectedUnits.clear();
+    if (!grouping || activeUnit?.design.group === 'Captains') selectedUnits.clear();
     if (!selectedUnits.delete(selected)) selectedUnits.add(selected);
     updateSelection();
-  } else if (!selectingGroup && !addToGroup && activeUnit?.design.group === 'Captains' && !activeUnit.holdPoint) {
+  } else if (!grouping && activeUnit?.design.group === 'Captains') {
     activeUnit.target = {
       x: Math.max(20, Math.min(world - 20, x)),
       y: Math.max(20, Math.min(depth - 20, y)),
@@ -408,7 +412,7 @@ function updateBattle(seconds, now) {
         target.hp = Math.max(0, target.hp - unit.design.damage);
         if (!target.design) refreshHealth();
       }
-    } else if (!unit.holdPoint) {
+    } else if (!unit.holdPoint && unit.design.group !== 'Captains') {
       advanceUnit(unit, base, seconds);
     }
   }
